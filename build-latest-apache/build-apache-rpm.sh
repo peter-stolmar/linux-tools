@@ -1,8 +1,16 @@
 #!/bin/bash
 
+# Prepare download directory
+mkdir -p ~/download
+cd ~/download
+
 # Determine download location
 FEDORA=$(curl -s "http://dl.fedoraproject.org/pub/fedora/linux/releases/" | grep [[:digit:]][[:digit:]] | cut -d\> -f3 | cut -d\/ -f1 | sort -n | tail -n1 )
-SRPMSOURCE="http://dl.fedoraproject.org/pub/fedora/linux/releases/$FEDORA/Everything/source/SRPMS/"
+#SRPMSOURCE="http://dl.fedoraproject.org/pub/fedora/linux/releases/$FEDORA/Everything/source/SRPMS"
+
+SRPMSOURCE="https://archive.fedoraproject.org/pub/archive/fedora/linux/releases/18/Fedora/source/SRPMS"
+
+DISTCACHE="distcache-1.4.5-23.src.rpm"
 
 # Prepare rpm build environment
 mkdir -p ~/rpmbuild/{BUILD,SOURCES,RPMS,SRPMS,SPECS}
@@ -24,9 +32,9 @@ sudo yum -y install rpm-build gcc make redhat-rpm-config autoconf libtool doxyge
 # Determine latest available (stable/release) Apache version
 APACHE=`curl -s "http://archive.apache.org/dist/httpd/?C=M;O=D" | grep \>httpd\-*\.*\.*\.tar\.bz2\< | head -n1 | cut -d\> -f 3 | cut -d\< -f 1`;
 
-APACHEBASE=`basename $apache .tar.bz2`;
+APACHEBASE=`basename $APACHE .tar.bz2`;
 
-VERSION=`echo $base | cut -d- -f2`;
+VERSION=`echo $APACHEBASE | cut -d- -f2`;
 
 cd ~/rpmbuild/SOURCES
 
@@ -34,18 +42,22 @@ cd ~/rpmbuild/SOURCES
 rm -f $APACHE
 
 # Download latest source
-wget http://apache.tradebit.com/pub//httpd/$APACHE
+#wget http://apache.tradebit.com/pub//httpd/$APACHE
+wget http://apache.mirrors.pair.com/httpd/$APACHE
 
-if [ $? -ne 0 ]; then
-	# Try another mirror
-	# TODO
-	# wget http://another.apache.mirror/pub/httpd/$apache
+if [ ! -f $APACHE ]; then
+        # Try another mirror
+      wget http://mirrors.gigenet.com/apache/httpd/$APACHE
+      if [ ! -f $APACHE ]; then
+        echo "Apache download failed. Exiting"
+        exit 1
+      fi
 fi
 
 tar xvjf $APACHE
 
 if [ $? -ne 0 ]; then
-	echo "Apache source download failed. Exiting."
+        echo "Apache source download failed. Exiting."
 fi
 
 #############
@@ -60,9 +72,9 @@ grep -q mod_proxy_wstunnel.so $APACHEBASE/httpd.spec
 
     tar cjf $APACHEBASE-1.tar.bz2 $APACHEBASE
 
-    version="$version-1"
-    base="$APACHEBASE-1"
-    apache="$APACHEBASE.tar.bz2"
+    VERSION="$VERSION-1"
+    APACHEBASE="$APACHEBASE-1"
+    APACHE="$APACHEBASE.tar.bz2"
 
   fi
 
@@ -76,14 +88,14 @@ cd ~/rpmbuild/SOURCES
 APR=`curl -s "http://archive.apache.org/dist/apr/" | grep apr-[[:digit:]]\.*\.*\.tar.bz2\< | tail -n1 | cut -d\> -f 3 | cut -d\< -f 1`
 
 
-rm -f $apr
+rm -f $APR
 
-wget http://archive.apache.org/dist/apr/$apr
-APRBASE=`basename $apr .tar.bz2`
+wget http://archive.apache.org/dist/apr/$APR
+APRBASE=`basename $APR .tar.bz2`
 
 rpmbuild -tb $APR
 
-sudo rpm -Uvh ~/rpmbuild/RPMS/x86_64/$aprbase*.x86_64.rpm ~/rpmbuild/RPMS/x86_64/apr-devel*.x86_64.rpm
+sudo rpm -Uvh ~/rpmbuild/RPMS/x86_64/$APRBASE*.x86_64.rpm ~/rpmbuild/RPMS/x86_64/apr-devel*.x86_64.rpm
 
 APRUTIL=`curl -s "http://archive.apache.org/dist/apr/" | grep apr-util-[[:digit:]]\.*\.*\.tar.bz2\< | tail -n1 | cut -d\> -f 3 | cut -d\< -f 1`
 
@@ -97,12 +109,14 @@ rm -f ~/rpmbuild/RPMS/x86_64/apr-util*
 
 rpmbuild -tb $APRUTIL
 
-sudo rpm -Uvh ~/rpmbuild/RPMS/x86_64/$aprutilbase*.x86_64.rpm ~/rpmbuild/RPMS/x86_64/apr-util-devel*.x86_64.rpm
+#sudo rpm -Uvh ~/rpmbuild/RPMS/x86_64/$APRUTILBASE*.x86_64.rpm ~/rpmbuild/RPMS/x86_64/apr-util-devel*.x86_64.rpm
+
+sudo rpm -Uvh ~/rpmbuild/RPMS/x86_64/apr-util*
 
 cd ~/rpmbuild/SRPMS/x86_64
-DISTCACHE=`curl -s "$SRPMSOURCE/d/" | grep \>distcache-[[:digit:]]\.*\.*\.src.rpm\< | tail -n1 | cut -d\> -f2 | cut -d\< -f1`
+#DISTCACHE=`curl -s "$SRPMSOURCE/d/" | grep \>distcache-[[:digit:]]\.*\.*\.src.rpm\< | tail -n1 | cut -d\> -f2 | cut -d\< -f1`
 
-rm -f $distcache
+rm -f $DISTCACHE
 rm -f ~/rpmbuild/RPMS/x86_64/distcache*
 
 wget "$SRPMSOURCE/d/$DISTCACHE"
